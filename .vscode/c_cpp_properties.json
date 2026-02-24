@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Users/devel0per/AppData/Local/Arduino15/packages/esp32/hardware/esp32/*/cores/esp32",
+                "C:/Users/devel0per/AppData/Local/Arduino15/packages/esp32/hardware/esp32/*/libraries/**",
+                "C:/Users/devel0per/AppData/Local/Arduino15/packages/esp32/hardware/esp32/*/tools/sdk/esp32/include/**",
+                "C:/Users/devel0per/Documents/Arduino/libraries/**"
+            ],
+            "defines": [
+                "ESP32",
+                "ARDUINO_ARCH_ESP32"
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}

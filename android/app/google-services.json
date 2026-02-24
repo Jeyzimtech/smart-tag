@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "256806377666",
+    "project_id": "ceres-tag-8115b",
+    "storage_bucket": "ceres-tag-8115b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:256806377666:android:8b1006ebfcadf7c0c9435b",
+        "android_client_info": {
+          "package_name": "group1.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUShhpuHqC1wbkfuggTB2FtmDGuHDUPvc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

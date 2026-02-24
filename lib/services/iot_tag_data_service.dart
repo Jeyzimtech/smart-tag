@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:latlong2/latlong.dart';
 
 class IoTTagDataService extends ChangeNotifier {
   late FirebaseDatabase _realtimeDb;
@@ -22,8 +23,14 @@ class IoTTagDataService extends ChangeNotifier {
   // Status
   bool _isConnected = false;
   DateTime _lastUpdated = DateTime.now();
-  String _deviceId = 'ESP32_001';
+  String _deviceId =
+      'ESP32_001'; // Default updated back to original for backwards compatibility
   String? _errorMessage;
+
+  // Geofence Data
+  bool _geofenceEnabled = false;
+  List<LatLng> _geofencePoints = [];
+  String _geofenceStatus = "inside"; // 'inside' or 'outside'
 
   // Getters
   double get temperature => _temperature;
@@ -36,6 +43,10 @@ class IoTTagDataService extends ChangeNotifier {
   double get accelZ => _accelZ;
   bool get isConnected => _isConnected;
 
+  bool get geofenceEnabled => _geofenceEnabled;
+  List<LatLng> get geofencePoints => _geofencePoints;
+  String get geofenceStatus => _geofenceStatus;
+
   String get lastUpdated {
     return _lastUpdated.toString().split('.').first;
   }
@@ -46,6 +57,8 @@ class IoTTagDataService extends ChangeNotifier {
   StreamSubscription? _environmentalSubscription;
   StreamSubscription? _gpsSubscription;
   StreamSubscription? _accelSubscription;
+  StreamSubscription? _geofenceSubscription;
+  StreamSubscription? _currentLocationSubscription;
 
   IoTTagDataService() {
     // Initialize Firebase Realtime Database with explicit URL
@@ -64,6 +77,20 @@ class IoTTagDataService extends ChangeNotifier {
     _listenToEnvironmental();
     _listenToGPS();
     _listenToAccelerometer();
+    _listenToGeofence();
+    _listenToCurrentLocation();
+  }
+
+  void setDeviceId(String id) {
+    if (_deviceId != id) {
+      _deviceId = id;
+      _environmentalSubscription?.cancel();
+      _gpsSubscription?.cancel();
+      _accelSubscription?.cancel();
+      _geofenceSubscription?.cancel();
+      _currentLocationSubscription?.cancel();
+      _startListeningToData();
+    }
   }
 
   /// Listen to environmental data (temperature & humidity)
@@ -123,56 +150,99 @@ class IoTTagDataService extends ChangeNotifier {
         );
   }
 
-  /// Listen to GPS data (location)
+  /// Listen to GPS data (location) - Legacy path
   void _listenToGPS() {
     String path = '/devices/$_deviceId/gps';
 
-    _gpsSubscription = _realtimeDb
-        .ref(path)
-        .onValue
-        .listen(
-          (event) {
-            try {
-              if (event.snapshot.exists) {
-                final data = Map<String, dynamic>.from(
-                  event.snapshot.value as Map,
-                );
+    _gpsSubscription = _realtimeDb.ref(path).onValue.listen((event) {
+      try {
+        if (event.snapshot.exists) {
+          final data = Map<String, dynamic>.from(event.snapshot.value as Map);
 
-                _latitude =
-                    double.tryParse(data['latitude']?.toString() ?? '0') ?? 0.0;
-                _longitude =
-                    double.tryParse(data['longitude']?.toString() ?? '0') ??
-                    0.0;
-                _satellites =
-                    int.tryParse(data['satellites']?.toString() ?? '0') ?? 0;
+          // Use old data if new currentLocation structure isn't populated
+          if (_latitude == 0.0) {
+            _latitude =
+                double.tryParse(data['latitude']?.toString() ?? '0') ?? 0.0;
+            _longitude =
+                double.tryParse(data['longitude']?.toString() ?? '0') ?? 0.0;
+          }
 
-                _isConnected = true;
-                _errorMessage = null;
-                _lastUpdated = DateTime.now();
+          _satellites =
+              int.tryParse(data['satellites']?.toString() ?? '0') ?? 0;
 
-                debugPrint(
-                  '✓ GPS Data Updated - Lat: $_latitude, Lon: $_longitude, Satellites: $_satellites',
-                );
-                notifyListeners();
-              } else {
-                _isConnected = false;
-                _errorMessage = 'No GPS data at path: $path';
-                notifyListeners();
-              }
-            } catch (e) {
-              debugPrint('Error reading GPS data: $e');
-              _isConnected = false;
-              _errorMessage = 'Error parsing GPS data: $e';
-              notifyListeners();
+          _isConnected = true;
+          _errorMessage = null;
+          _lastUpdated = DateTime.now();
+
+          notifyListeners();
+        }
+      } catch (e) {
+        debugPrint('Error reading GPS data: $e');
+      }
+    });
+  }
+
+  /// Listen to new structured current location
+  void _listenToCurrentLocation() {
+    String path = '/tags/$_deviceId/currentLocation';
+    _currentLocationSubscription = _realtimeDb.ref(path).onValue.listen((
+      event,
+    ) {
+      if (event.snapshot.exists) {
+        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        _latitude =
+            double.tryParse(data['lat']?.toString() ?? '0') ?? _latitude;
+        _longitude =
+            double.tryParse(data['lng']?.toString() ?? '0') ?? _longitude;
+        if (data['status'] != null) {
+          _geofenceStatus = data['status'].toString();
+        }
+        _isConnected = true;
+        _lastUpdated = DateTime.now();
+        notifyListeners();
+      }
+    });
+  }
+
+  /// Listen to Geofence settings
+  void _listenToGeofence() {
+    String path = '/tags/$_deviceId/geofence';
+    _geofenceSubscription = _realtimeDb.ref(path).onValue.listen((event) {
+      if (event.snapshot.exists) {
+        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        _geofenceEnabled = data['enabled'] == true || data['enabled'] == 'true';
+
+        List<LatLng> parsedPoints = [];
+        if (data['points'] != null) {
+          List<dynamic> pointsList = data['points'];
+          for (var p in pointsList) {
+            if (p != null && p is Map) {
+              double lat = double.tryParse(p['lat'].toString()) ?? 0.0;
+              double lng = double.tryParse(p['lng'].toString()) ?? 0.0;
+              parsedPoints.add(LatLng(lat, lng));
             }
-          },
-          onError: (error) {
-            debugPrint('GPS listener error: $error');
-            _isConnected = false;
-            _errorMessage = 'GPS access error: $error (Check Firebase Rules)';
-            notifyListeners();
-          },
-        );
+          }
+        }
+        _geofencePoints = parsedPoints;
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<void> updateGeofenceSettings({
+    required bool enabled,
+    required List<LatLng> points,
+  }) async {
+    String path = '/tags/$_deviceId/geofence';
+
+    List<Map<String, double>> serializedPoints = points
+        .map((p) => {'lat': p.latitude, 'lng': p.longitude})
+        .toList();
+
+    await _realtimeDb.ref(path).set({
+      'enabled': enabled,
+      'points': serializedPoints,
+    });
   }
 
   /// Listen to accelerometer data (movement)
@@ -329,6 +399,8 @@ class IoTTagDataService extends ChangeNotifier {
     _environmentalSubscription?.cancel();
     _gpsSubscription?.cancel();
     _accelSubscription?.cancel();
+    _geofenceSubscription?.cancel();
+    _currentLocationSubscription?.cancel();
     super.dispose();
   }
 }

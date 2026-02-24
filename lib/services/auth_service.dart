@@ -7,10 +7,10 @@ class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   User? _user;
   User? get user => _user;
-  
+
   bool get isAuthenticated => _user != null;
 
   AuthService() {
@@ -20,22 +20,33 @@ class AuthService extends ChangeNotifier {
     });
   }
 
-  Future<void> signUp(String email, String password) async {
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phoneNumber,
+    required String role,
+  }) async {
     UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
-    
+
     // Save user data to Firestore
     await _firestore.collection('users').doc(userCredential.user!.uid).set({
       'email': email,
       'uid': userCredential.user!.uid,
       'createdAt': FieldValue.serverTimestamp(),
-      'displayName': email.split('@')[0], // Use email prefix as default display name
+      'displayName': fullName,
       'profileImage': '',
-      'phoneNumber': '',
+      'phoneNumber': phoneNumber,
+      'role': role,
       'lastLogin': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> updateUserProfile(String uid, Map<String, dynamic> data) async {
+    await _firestore.collection('users').doc(uid).update(data);
   }
 
   Future<void> signInWithGoogle() async {
@@ -52,12 +63,16 @@ class AuthService extends ChangeNotifier {
       idToken: googleAuth.idToken,
     );
 
-    UserCredential userCredential = await _auth.signInWithCredential(credential);
-    
+    UserCredential userCredential = await _auth.signInWithCredential(
+      credential,
+    );
+
     // Create user document if it doesn't exist
-    final userDoc = _firestore.collection('users').doc(userCredential.user!.uid);
+    final userDoc = _firestore
+        .collection('users')
+        .doc(userCredential.user!.uid);
     final docSnapshot = await userDoc.get();
-    
+
     if (!docSnapshot.exists) {
       await userDoc.set({
         'email': userCredential.user!.email,
@@ -70,9 +85,7 @@ class AuthService extends ChangeNotifier {
       });
     } else {
       // Update last login time
-      await userDoc.update({
-        'lastLogin': FieldValue.serverTimestamp(),
-      });
+      await userDoc.update({'lastLogin': FieldValue.serverTimestamp()});
     }
   }
 
@@ -81,13 +94,15 @@ class AuthService extends ChangeNotifier {
       email: email,
       password: password,
     );
-    
+
     // Update last login time
-    await _firestore.collection('users').doc(userCredential.user!.uid).update({
-      'lastLogin': FieldValue.serverTimestamp(),
-    }).catchError((e) {
-      debugPrint('Error updating last login: $e');
-    });
+    await _firestore
+        .collection('users')
+        .doc(userCredential.user!.uid)
+        .update({'lastLogin': FieldValue.serverTimestamp()})
+        .catchError((e) {
+          debugPrint('Error updating last login: $e');
+        });
   }
 
   Future<void> signOut() async {
@@ -96,7 +111,7 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Google Sign Out error: $e');
     }
-    
+
     try {
       await _auth.signOut();
       notifyListeners(); // Notify listeners that user is logged out

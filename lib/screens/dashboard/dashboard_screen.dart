@@ -3,11 +3,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
-import '../../services/auth_service.dart';
 import '../../services/iot_tag_data_service.dart';
 import '../../widgets/common/radial_background.dart';
 import '../alerts_screen.dart';
 import '../live_map_screen.dart';
+import '../settings/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,48 +24,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<IoTTagDataService>().checkDeviceConnection();
     });
-  }
-
-  void _handleLogout() async {
-    final confirmed =
-        await showDialog<bool>(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Confirm Logout'),
-              content: const Text('Are you sure you want to logout?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text(
-                    'Logout',
-                    style: TextStyle(color: AppColors.error),
-                  ),
-                ),
-              ],
-            );
-          },
-        ) ??
-        false;
-
-    if (!confirmed) return;
-
-    try {
-      await context.read<AuthService>().signOut();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Logout failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   @override
@@ -112,40 +70,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   );
                 },
               ),
-              PopupMenuButton<String>(
-                icon: const CircleAvatar(
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileScreen(),
+                    ),
+                  );
+                },
+                child: const CircleAvatar(
                   backgroundColor: AppColors.primaryBlue,
                   child: Icon(Icons.person, color: Colors.white),
                 ),
-                itemBuilder: (BuildContext context) => [
-                  const PopupMenuItem<String>(
-                    value: 'profile',
-                    child: ListTile(
-                      leading: Icon(Icons.person),
-                      title: Text('Profile'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem<String>(
-                    value: 'logout',
-                    child: ListTile(
-                      leading: const Icon(Icons.logout, color: AppColors.error),
-                      title: const Text(
-                        'Logout',
-                        style: TextStyle(color: AppColors.error),
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-                onSelected: (String value) {
-                  if (value == 'logout') {
-                    _handleLogout();
-                  }
-                },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 16),
             ],
           ),
 

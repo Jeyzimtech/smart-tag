@@ -1,0 +1,9 @@
+# INSTRUCTIONS: 
+# 1. Generate keystore: keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release
+# 2. Fill in the values below
+# 3. NEVER commit this file to git (already in .gitignore)
+
+storePassword=YOUR_STORE_PASSWORD_HERE
+keyPassword=YOUR_KEY_PASSWORD_HERE
+keyAlias=release
+storeFile=../release-key.jks

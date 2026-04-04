@@ -1,6 +1,12 @@
-# ceres_tag_app
+# smart_ceres_tag
 
 A new Flutter project.
+
+## Smart Tag Demo Video
+
+Watch how Smart Tag works here:
+
+- [Smart Tag YouTube Video](https://youtu.be/PCDjuvW_tl0)
 
 ## Getting Started
 
